@@ -1,4 +1,5 @@
 import json
+import threading
 
 from pydantic import BaseModel
 from automata.tm.dtm import DTM
@@ -9,7 +10,7 @@ from sqlalchemy.orm import Session
 
 import asyncio
 import aio_pika
-
+import uvicorn
 
 from sql_app import crud, models, schemas
 from sql_app.database import engine, SessionLocal
@@ -44,8 +45,6 @@ class MT(BaseModel):
     final_states: List[str]
     transitions: Dict[str, Dict[str, List[str]]]
 
-# Patter Singleton
-# Dependency
 def get_db():
     db = SessionLocal()
     try:
@@ -96,12 +95,22 @@ async def send_mt_batch(mts: List[MT]):
             routing_key="mt_queue"
         )
 
-    await asyncio.sleep(2)  # Used only for visualization of the queue graph in RabbitMQ
+    await asyncio.sleep(2) 
 
     return {
         "code": "200",
         "msg": "Batch processed successfully"
     }
+
+async def run_consumer():
+    await consume_messages()
+
+def start_consumer():
+    asyncio.get_event_loop().run_until_complete(run_consumer())
+
+if __name__ == "__main__":
+    threading.Thread(target=start_consumer).start()
+    uvicorn.run(app, host="0.0.0.0", port=8000)
 
 @app.get("/get_history/{id}")
 async def get_history(id: int, db: Session = Depends(get_db)):
